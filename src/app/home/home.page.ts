@@ -116,6 +116,11 @@ export class HomePage implements OnInit {
     try {
       await this.ensureOutCtx();
 
+      // ✅ START button ke gesture par mic permission lo
+      if (!this.micPermGranted) {
+        await this.ensureMicPermissionUserGesture();
+      }
+
       this.ws = new WebSocket(url);
       this.ws.binaryType = 'arraybuffer';
 
@@ -175,7 +180,7 @@ export class HomePage implements OnInit {
       if (j.type === 'agent_ready') {
         this.agentReady = true;
         this.append('✅ agent_ready');
-        if (this.wantMic && !this.micOn) this.startMic();
+        if (this.wantMic && !this.micOn && this.micPermGranted) this.startMic();
         return;
       }
 
@@ -402,4 +407,30 @@ export class HomePage implements OnInit {
   ngOnDestroy(): void {
     this.disconnect();
   }
+
+  private async ensureMicPermissionUserGesture() {
+    // HTTPS check (localhost allowed)
+    if (!window.isSecureContext && location.hostname !== 'localhost') {
+      console.log('❌ HTTPS required for mic (or use localhost)');
+      throw new Error('Mic needs HTTPS or localhost');
+    }
+    if (!navigator?.mediaDevices?.getUserMedia) {
+      console.log('❌ Mic API not available');
+      throw new Error('Mic API not available');
+    }
+    try {
+      // Prompt user; then close immediately. This only grabs permission.
+      const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+      s.getTracks().forEach(t => t.stop());
+      this.micPermRequested = true;
+      this.micPermGranted = true;
+      console.log('✅ Mic permission granted (on START)');
+    } catch (e: any) {
+      this.micPermRequested = true;
+      this.micPermGranted = false;
+      console.log('🚫 Mic permission denied:', e?.message ?? e);
+      throw e;
+    }
+  }
+
 }
