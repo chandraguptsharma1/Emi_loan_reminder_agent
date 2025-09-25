@@ -1,5 +1,4 @@
-
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
@@ -12,12 +11,14 @@ import {
   IonButton,
   IonInput,
   IonText,
+  IonIcon
 } from '@ionic/angular/standalone'
 
 @Component({
   selector: 'app-home',
   templateUrl: 'home.page.html',
   styleUrls: ['home.page.scss'],
+  standalone: true,
   imports: [
     CommonModule,
     FormsModule,
@@ -28,9 +29,10 @@ import {
     IonButton,
     IonInput,
     IonText,
+    IonIcon
   ],
 })
-export class HomePage {
+export class HomePage implements OnInit {
   // ---- WS state ----
   private ws?: WebSocket;
   connected = false;
@@ -58,15 +60,44 @@ export class HomePage {
   micOn = false;
   private floatBuf: number[] = [];
 
+  // mic permission flags
+  micPermRequested = false;
+  micPermGranted = false;
+
   // ---- Output audio (playback) ----
   private outCtx?: AudioContext;
   private outPlayhead = 0;
 
   // ---- Config ----
   private wsUrl(): string {
-    // NOTE: Netlify/HTTPS पर deploy करने पर WSS उपयोग करें
+    // NOTE: HTTPS पर deploy करने पर WSS उपयोग करें
     return 'ws://15.207.88.18:8090/ws/app?id=webtest1';
     // return 'wss://your-domain/ws/app?id=webtest1';
+  }
+
+  speaking = false; // agent बोल रहा हो तो true
+
+  // ===================== INIT: ask mic permission =====================
+  async ngOnInit() {
+    await this.preRequestMicPermission();
+  }
+
+  private async preRequestMicPermission() {
+    if (!navigator?.mediaDevices?.getUserMedia) {
+      this.append('⚠️ Mic API not available in this browser');
+      return;
+    }
+    try {
+      this.micPermRequested = true;
+      // Prompt for mic access on page load, then immediately stop stream.
+      const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+      s.getTracks().forEach(t => t.stop());
+      this.micPermGranted = true;
+      this.append('✅ Mic permission granted (prefetched)');
+    } catch (e: any) {
+      this.micPermGranted = false;
+      this.append(`🚫 Mic permission denied: ${e?.message ?? e}`);
+    }
   }
 
   // ===================== Connect / Retry =====================
@@ -89,7 +120,6 @@ export class HomePage {
         this.append('✅ WS OPEN');
         this.startKA();
 
-        // optional hint
         this.sendJson({
           type: 'conversation_initiation_client_data',
           conversation_initiation_client_data: {
@@ -125,7 +155,6 @@ export class HomePage {
   private onMessage(evt: MessageEvent) {
     const data = evt.data;
     if (data instanceof ArrayBuffer) {
-      // (server sent raw PCM? we expect base64 JSON "audio" normally)
       this.schedulePcmPlayback(new Uint8Array(data));
       this.append(`🔊 raw chunk ${data.byteLength} bytes`);
       return;
@@ -220,6 +249,7 @@ export class HomePage {
   async startMic() {
     if (!this.connected || this.micOn) return;
     try {
+      // even if we pre-fetched permission, take a FRESH stream for processing
       const ms = await navigator.mediaDevices.getUserMedia({ audio: true });
       this.mediaStream = ms;
 
