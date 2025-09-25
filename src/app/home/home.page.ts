@@ -394,6 +394,8 @@ export class HomePage implements OnInit {
   private append(line: string) {
     const ts = new Date().toISOString().split('T')[1]!.split('.')[0];
     this.logs.unshift(`[${ts}] ${line}`);
+    console.log(line);
+    console.log(this.logs);
   }
 
   // ---- cleanup ----
