@@ -74,7 +74,7 @@ export class HomePage implements OnInit {
   // ---- Config ----
   private wsUrl(): string {
     // NOTE: HTTPS पर deploy करने पर WSS उपयोग करें
-    return 'ws://15.207.88.18:8090/ws/app?id=webtest1';
+    return 'wss://elevanagents.onrender.com/ws/app?id=webtest1';
     // return 'wss://your-domain/ws/app?id=webtest1';
   }
 
