@@ -67,6 +67,9 @@ export class HomePage implements OnInit {
   // ---- Output audio (playback) ----
   private outCtx?: AudioContext;
   private outPlayhead = 0;
+  // ---- Mic desire flag (auto start on WS open/reopen)
+  private wantMic = true;  // auto-start mic when websocket is up
+
 
   // ---- Config ----
   private wsUrl(): string {
@@ -104,6 +107,9 @@ export class HomePage implements OnInit {
   async connect() {
     if (this.connected) return;
     this.manualClose = false;
+
+    this.wantMic = true;
+
     const url = this.wsUrl();
     this.append(`Connecting → ${url}`);
 
@@ -119,6 +125,10 @@ export class HomePage implements OnInit {
         this.agentReady = false;
         this.append('✅ WS OPEN');
         this.startKA();
+
+        // WS खुलते ही mic on करने की कोशिश
+        if (this.wantMic && !this.micOn) this.startMic();
+
 
         this.sendJson({
           type: 'conversation_initiation_client_data',
@@ -165,6 +175,7 @@ export class HomePage implements OnInit {
       if (j.type === 'agent_ready') {
         this.agentReady = true;
         this.append('✅ agent_ready');
+        if (this.wantMic && !this.micOn) this.startMic();
         return;
       }
 
@@ -240,6 +251,7 @@ export class HomePage implements OnInit {
     this.manualClose = true;
     this.stopKA();
     this.stopMic(false);
+    this.wantMic = false;
     this.ws?.close(1000, 'manual');
     this.connected = false;
     this.append('🔒 manually closed');
@@ -303,6 +315,9 @@ export class HomePage implements OnInit {
     if (sendAudioEnd && this.connected) {
       this.sendJson({ type: 'user_audio_end' });
       this.append('🛑 sent user_audio_end');
+
+      // 👇 user ने जानबूझकर बंद किया, दोबारा auto-start न करें
+      this.wantMic = false;
     }
     if (this.micOn) this.micOn = false;
   }
