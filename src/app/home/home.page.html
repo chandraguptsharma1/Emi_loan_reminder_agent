@@ -1,0 +1,32 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Credit Card Emi Collection Agent</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <div class="row">
+    <ion-button [disabled]="connected" (click)="connect()">Connect</ion-button>
+    <ion-button [disabled]="!connected" (click)="disconnect()">Disconnect</ion-button>
+    <span class="status">{{ statusText() }}</span>
+    <span class="agent" *ngIf="connected">Agent: {{ agentReady ? 'Ready' : 'Waiting…' }}</span>
+  </div>
+
+  <div class="row">
+    <ion-button [disabled]="!connected || agentReady==false || micOn" (click)="startMic()">Start Mic</ion-button>
+    <ion-button color="medium" [disabled]="!connected || !micOn" (click)="stopMic(true)">Stop Mic</ion-button>
+    <span>{{ micOn ? '🎙️ streaming…' : '🎙️ off' }}</span>
+  </div>
+
+  <!-- <div class="row">
+    <ion-input fill="outline" label="Message to agent" [(ngModel)]="textMsg"></ion-input>
+    <ion-button [disabled]="!connected" (click)="sendText()">Send</ion-button>
+  </div> -->
+
+  <ion-text color="medium">
+    <h3>Logs</h3>
+  </ion-text>
+  <div class="logs">
+    <pre *ngFor="let l of logs">{{ l }}</pre>
+  </div>
+</ion-content>

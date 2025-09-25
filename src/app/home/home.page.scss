@@ -1,0 +1,30 @@
+.row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.status {
+  font-weight: 600;
+}
+
+.agent {
+  margin-left: 12px;
+}
+
+.logs {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 8px;
+  max-height: 50vh;
+  overflow: auto;
+  background: #fafafa;
+}
+
+pre {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
