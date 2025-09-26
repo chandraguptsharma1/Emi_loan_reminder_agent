@@ -264,3 +264,56 @@ ion-button {
     animation: none !important;
   }
 }
+
+.btn-wide {
+  min-width: 160px;
+}
+
+.btn-spinner {
+  margin-right: 8px;
+  transform: translateY(2px);
+}
+
+.btn-label {
+  font-weight: 600;
+  letter-spacing: 0.4px;
+}
+
+/* Message area styles */
+.ui-msg {
+  margin: 16px auto 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  display: grid;
+  grid-template-columns: 24px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  max-width: 560px;
+  background: #1f2937;
+  /* default dark neutral */
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, .22);
+}
+
+.ui-msg.success {
+  background: #065f46;
+}
+
+/* emerald-800 */
+.ui-msg.error {
+  background: #7f1d1d;
+}
+
+/* red-900  */
+.msg-icon {
+  font-size: 20px;
+}
+
+.msg-text {
+  font-weight: 500;
+}
+
+.msg-close {
+  color: #fff;
+  text-transform: none;
+}
