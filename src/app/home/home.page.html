@@ -2,7 +2,7 @@
 
   <!-- Top centered title -->
   <div class="page-title">
-    <h1>Credit Card Emi Collection Agent</h1>
+    <h1>Emi Collection Agent</h1>
   </div>
 
   <!-- Centered crystal + label -->
@@ -11,14 +11,15 @@
       <div class="ring"></div>
       <div class="blob"></div>
     </div>
-    <p class="ai-label">AI Assistant</p>
+    <p class="ai-label">Sureco AI Assistant</p>
   </section>
 
   <section class="panel">
     <div class="controls center">
-      <ion-button fill="solid" color="light" [disabled]="connected" (click)="connect()">START</ion-button>
+      <ion-button fill="solid" color="light" [disabled]="connected || loading" (click)="connect()">START</ion-button>
       <ion-button fill="solid" color="danger" [disabled]="!connected" (click)="disconnect()">END</ion-button>
     </div>
+
 
     <!-- <div class="status-row center">
       <ion-icon name="radio-outline" class="dot" [class.on]="connected"></ion-icon>
