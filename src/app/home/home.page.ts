@@ -12,11 +12,8 @@ import {
   IonInput,
   IonText,
   IonIcon,
-  IonSpinner,            // ✅ add this
-} from '@ionic/angular/standalone';
-
-// Controllers for loader & toast
-import { LoadingController, ToastController } from '@ionic/angular';
+  IonSpinner,
+} from '@ionic/angular/standalone'
 
 @Component({
   selector: 'app-home',
@@ -34,7 +31,7 @@ import { LoadingController, ToastController } from '@ionic/angular';
     IonInput,
     IonText,
     IonIcon,
-    IonSpinner,          // ✅ add this
+    IonSpinner,
   ],
 })
 export class HomePage implements OnInit {
@@ -43,11 +40,13 @@ export class HomePage implements OnInit {
   connected = false;
   private manualClose = false;
   private retries = 0;
-  private ka?: any;
+  private ka?: any; // keep-alive timer
 
   // agent readiness (to gate mic)
   agentReady = false;
 
+  // ✅ keep this for the button spinner
+  loading = false;
   // ping → "Listening…" UX
   private lastPing?: number;
   private lastListeningLog?: number;
@@ -55,10 +54,6 @@ export class HomePage implements OnInit {
   // ---- UI ----
   logs: string[] = [];
   textMsg = 'Hello from Ionic!';
-
-  // Loading / Toast UI state
-  loading = false;
-  private loadingEl?: HTMLIonLoadingElement;
 
   // ---- Mic / WebAudio ----
   private audioCtx?: AudioContext;
@@ -73,75 +68,24 @@ export class HomePage implements OnInit {
   micPermRequested = false;
   micPermGranted = false;
 
+
+
+  // ✅ NEW: message strip state
+  uiMsg = '';
+  uiMsgType: 'success' | 'error' | 'info' = 'info';
+
+
   // ---- Output audio (playback) ----
   private outCtx?: AudioContext;
   private outPlayhead = 0;
 
-  // ---- Mic desire flag
-  private wantMic = true;
-
-  speaking = false;
-
-  // ✅ Message strip state
-  uiMsg = '';
-  uiMsgType: 'success' | 'error' | 'info' = 'info';
-
-  constructor(
-    private loadingCtrl: LoadingController,
-    private toastCtrl: ToastController
-  ) { }
-
-  // ===================== INIT =====================
-  async ngOnInit() {
-    await this.preRequestMicPermission();
+  // ---- Config ----
+  private wsUrl(): string {
+    // NOTE: HTTPS पर deploy करने पर WSS उपयोग करें
+    return 'wss://elevanagents.onrender.com/ws/app?id=webtest1';
+    // return 'wss://your-domain/ws/app?id=webtest1';
   }
 
-  private async preRequestMicPermission() {
-    if (!navigator?.mediaDevices?.getUserMedia) {
-      this.append('⚠️ Mic API not available in this browser');
-      return;
-    }
-    try {
-      this.micPermRequested = true;
-      const s = await navigator.mediaDevices.getUserMedia({ audio: true });
-      s.getTracks().forEach(t => t.stop());
-      this.micPermGranted = true;
-      this.append('✅ Mic permission granted (prefetched)');
-    } catch (e: any) {
-      this.micPermGranted = false;
-      this.append(`🚫 Mic permission denied: ${e?.message ?? e}`);
-      this.presentToast('Microphone permission denied', 'danger');
-      this.setUiMsg('Microphone permission denied.', 'error');
-    }
-  }
-
-  // ===================== Helpers: Loader/Toast/Msg =====================
-  private async showLoader(message = 'Connecting…') {
-    this.loading = true;
-    try {
-      this.loadingEl = await this.loadingCtrl.create({
-        message,
-        spinner: 'circular',
-        backdropDismiss: false,
-        cssClass: 'connect-loading'
-      });
-      await this.loadingEl.present();
-    } catch { }
-  }
-  private async hideLoader() {
-    this.loading = false;
-    try { await this.loadingEl?.dismiss(); } catch { }
-    this.loadingEl = undefined;
-  }
-  private async presentToast(message: string, color: 'success' | 'warning' | 'danger' | 'medium' = 'medium') {
-    const t = await this.toastCtrl.create({
-      message,
-      duration: 2000,
-      position: 'bottom',
-      color
-    });
-    await t.present();
-  }
   setUiMsg(msg: string, type: 'success' | 'error' | 'info' = 'info') {
     this.uiMsg = msg;
     this.uiMsgType = type;
@@ -153,48 +97,140 @@ export class HomePage implements OnInit {
         : 'information-circle';
   }
 
-  // ===================== WS URL (via Netlify proxy) =====================
-  private wsUrl(): string {
-    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    // Netlify proxy: /ws/* → your Render server
-    return `${proto}://elevanagents.onrender.com/ws/app?id=webtest1`;
+
+  speaking = false; // agent बोल रहा हो तो true
+
+  // ===================== INIT: ask mic permission =====================
+  async ngOnInit() {
+    await this.preRequestMicPermission();
   }
 
-  // ===================== Connect / Retry =====================
-  async connect() {
-    this.setUiMsg('Connecting to agent…', 'info');
-    if (this.connected) return;
+  private async preRequestMicPermission() {
+    if (!navigator?.mediaDevices?.getUserMedia) {
+      this.append('⚠️ Mic API not available in this browser');
+      return;
+    }
+    try {
+      this.micPermRequested = true;
+      // Prompt for mic access on page load, then immediately stop stream.
+      const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+      s.getTracks().forEach(t => t.stop());
+      this.micPermGranted = true;
+      this.append('✅ Mic permission granted (prefetched)');
+    } catch (e: any) {
+      this.micPermGranted = false;
+      this.append(`🚫 Mic permission denied: ${e?.message ?? e}`);
+    }
+  }
 
+  // // ===================== Connect / Retry =====================
+  // async connect() {
+  //   this.setUiMsg('Connecting to agent…', 'info');
+
+  //   if (this.connected) return;
+  //   this.manualClose = false;
+  //   const url = this.wsUrl();
+  //   this.append(`Connecting → ${url}`);
+  //   this.loading = true;
+  //   try {
+  //     await this.ensureOutCtx();
+
+  //     this.ws = new WebSocket(url);
+  //     this.ws.binaryType = 'arraybuffer';
+
+  //     this.ws.addEventListener('open', async () => {
+  //       this.connected = true;
+  //       this.retries = 0;
+  //       this.agentReady = false;
+  //       this.append('✅ WS OPEN');
+  //       this.startKA();
+
+
+
+  //       this.setUiMsg('Connected ✓ You can speak now.', 'success');
+
+
+  //       this.sendJson({
+  //         type: 'conversation_initiation_client_data',
+  //         conversation_initiation_client_data: {
+  //           conversation_config_override: { conversation: { text_only: false } },
+  //         },
+  //       });
+  //     });
+
+  //     this.ws.addEventListener('message', (evt) => this.onMessage(evt));
+  //     this.ws.addEventListener('close', (e) => {
+  //       this.loading = false;
+  //       this.append(`❌ WS CLOSE (${e.code})`);
+  //       this.stopKA();
+  //       this.stopMic(false);
+  //       this.connected = false; this.agentReady = false;
+  //       this.ws = undefined;
+
+
+
+  //       if (!this.manualClose) this.scheduleReconnect();
+  //     });
+  //     this.ws.addEventListener('error', () => {
+  //       this.loading = false;
+  //       this.append('❌ WS ERROR');
+  //       this.stopKA();
+  //       this.stopMic(false);
+  //       this.connected = false; this.agentReady = false;
+  //       this.ws = undefined;
+  //       if (!this.manualClose) this.scheduleReconnect();
+  //     });
+  //   } catch (e: any) {
+  //     this.loading = false;
+  //     this.setUiMsg(`Connect failed: ${e?.message ?? e}`, 'error');
+  //     this.append(`❌ connect error: ${e?.message ?? e}`);
+  //     this.stopKA();
+  //     if (!this.manualClose) this.scheduleReconnect();
+  //   }
+  // }
+
+  async connect() {
+    if (this.connected || this.loading) return;
+    this.loading = true;
     this.manualClose = false;
-    this.wantMic = true;
 
     const url = this.wsUrl();
+    this.setUiMsg('Connecting to agent…', 'info');
     this.append(`Connecting → ${url}`);
-    await this.showLoader('Connecting to agent…');
 
     try {
       await this.ensureOutCtx();
 
+      // ✅ user gesture पर mic permission (auto)
       if (!this.micPermGranted) {
-        await this.ensureMicPermissionUserGesture();
+        try {
+          const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+          s.getTracks().forEach(t => t.stop());
+          this.micPermGranted = true;
+          this.append('🎤 Mic permission granted (on START)');
+        } catch (e: any) {
+          this.micPermGranted = false;
+          this.setUiMsg('Microphone permission denied.', 'error');
+          this.loading = false;
+          return; // permission बिना आगे नहीं
+        }
       }
 
       this.ws = new WebSocket(url);
       this.ws.binaryType = 'arraybuffer';
 
-      this.ws.addEventListener('open', async () => {
+      this.ws.addEventListener('open', () => {
         this.connected = true;
         this.retries = 0;
         this.agentReady = false;
+        this.loading = false;
         this.append('✅ WS OPEN');
-
-        await this.hideLoader();                      // single call
-        this.presentToast('Connected', 'success');    // single call
         this.setUiMsg('Connected ✓ You can speak now.', 'success');
 
         this.startKA();
 
-        if (this.wantMic && !this.micOn) this.startMic();
+        // ✅ auto start mic
+        if (this.micPermGranted && !this.micOn) this.startMic();
 
         this.sendJson({
           type: 'conversation_initiation_client_data',
@@ -206,38 +242,35 @@ export class HomePage implements OnInit {
 
       this.ws.addEventListener('message', (evt) => this.onMessage(evt));
 
-      const onCloseOrError = async (label: string, code?: number) => {
-        this.append(`${label}${code ? ' (' + code + ')' : ''}`);
+      this.ws.addEventListener('close', (e) => {
+        this.loading = false;
+        this.append(`❌ WS CLOSE (${e.code})`);
         this.stopKA();
         this.stopMic(false);
         this.connected = false; this.agentReady = false;
         this.ws = undefined;
-
-        await this.hideLoader();
-
-        if (label.includes('ERROR')) {
-          this.presentToast('Connection error. Retrying…', 'danger');
-          this.setUiMsg('Connection error. Retrying…', 'error');
-        } else {
-          this.presentToast('Disconnected. Retrying…', 'warning');
-          this.setUiMsg('Disconnected. Retrying…', 'info');
-        }
         if (!this.manualClose) this.scheduleReconnect();
-      };
+      });
 
-      this.ws.addEventListener('close', (e) => { onCloseOrError('❌ WS CLOSE', e.code); });
-      this.ws.addEventListener('error', () => { onCloseOrError('❌ WS ERROR'); });
+      this.ws.addEventListener('error', () => {
+        this.loading = false;
+        this.append('❌ WS ERROR');
+        this.stopKA();
+        this.stopMic(false);
+        this.connected = false; this.agentReady = false;
+        this.ws = undefined;
+        if (!this.manualClose) this.scheduleReconnect();
+      });
 
     } catch (e: any) {
-      await this.hideLoader();
-      this.presentToast(`Connect failed: ${e?.message ?? e}`, 'danger');
+      this.loading = false;
       this.setUiMsg(`Connect failed: ${e?.message ?? e}`, 'error');
-
       this.append(`❌ connect error: ${e?.message ?? e}`);
       this.stopKA();
       if (!this.manualClose) this.scheduleReconnect();
     }
   }
+
 
   private onMessage(evt: MessageEvent) {
     const data = evt.data;
@@ -252,7 +285,10 @@ export class HomePage implements OnInit {
       if (j.type === 'agent_ready') {
         this.agentReady = true;
         this.append('✅ agent_ready');
-        if (this.wantMic && !this.micOn && this.micPermGranted) this.startMic();
+        // ✅ ensure mic running when agent ready
+        if (this.micPermGranted && !this.micOn && this.connected) {
+          this.startMic();
+        }
         return;
       }
 
@@ -324,17 +360,12 @@ export class HomePage implements OnInit {
     this.append(`➡️ sent: "${t}"`);
   }
 
-  async disconnect() {
+  disconnect() {
     this.manualClose = true;
     this.stopKA();
     this.stopMic(false);
-    this.wantMic = false;
-
-    this.presentToast('Disconnected', 'medium');
-    this.setUiMsg('Disconnected by user.', 'info');
-
-    await this.hideLoader();
     this.ws?.close(1000, 'manual');
+    this.setUiMsg('Disconnected by user.', 'info');
     this.connected = false;
     this.append('🔒 manually closed');
   }
@@ -343,6 +374,7 @@ export class HomePage implements OnInit {
   async startMic() {
     if (!this.connected || this.micOn) return;
     try {
+      // even if we pre-fetched permission, take a FRESH stream for processing
       const ms = await navigator.mediaDevices.getUserMedia({ audio: true });
       this.mediaStream = ms;
 
@@ -376,10 +408,28 @@ export class HomePage implements OnInit {
       this.micOn = true;
     } catch (e: any) {
       this.append(`❌ mic error: ${e?.message ?? e}`);
-      this.presentToast(`Mic error: ${e?.message ?? e}`, 'danger');
-      this.setUiMsg(`Mic error: ${e?.message ?? e}`, 'error');
       this.stopMic(false);
     }
+  }
+
+  stopMic(sendAudioEnd: boolean) {
+    try { this.procNode?.disconnect(); } catch { }
+    this.procNode = undefined;
+    try { this.srcNode?.disconnect(); } catch { }
+    this.srcNode = undefined;
+    try { this.audioCtx?.close(); } catch { }
+    this.audioCtx = undefined;
+    if (this.mediaStream) {
+      try { this.mediaStream.getTracks().forEach(t => t.stop()); } catch { }
+    }
+    this.mediaStream = undefined;
+    this.floatBuf.length = 0;
+
+    if (sendAudioEnd && this.connected) {
+      this.sendJson({ type: 'user_audio_end' });
+      this.append('🛑 sent user_audio_end');
+    }
+    if (this.micOn) this.micOn = false;
   }
 
   private sendBinary(bytes: Uint8Array) {
@@ -454,64 +504,10 @@ export class HomePage implements OnInit {
   private append(line: string) {
     const ts = new Date().toISOString().split('T')[1]!.split('.')[0];
     this.logs.unshift(`[${ts}] ${line}`);
-    console.log(line);
   }
 
   // ---- cleanup ----
-  async ngOnDestroy() {
-    await this.hideLoader();
+  ngOnDestroy(): void {
     this.disconnect();
-  }
-
-  private async ensureMicPermissionUserGesture() {
-    if (!window.isSecureContext && location.hostname !== 'localhost') {
-      const msg = 'Mic needs HTTPS or localhost';
-      this.presentToast(msg, 'danger');
-      throw new Error(msg);
-    }
-    if (!navigator?.mediaDevices?.getUserMedia) {
-      const msg = 'Mic API not available';
-      this.presentToast(msg, 'danger');
-      throw new Error(msg);
-    }
-    try {
-      const s = await navigator.mediaDevices.getUserMedia({ audio: true });
-      s.getTracks().forEach(t => t.stop());
-      this.micPermRequested = true;
-      this.micPermGranted = true;
-    } catch (e: any) {
-      this.micPermRequested = true;
-      this.micPermGranted = false;
-      const msg = `Mic permission denied: ${e?.message ?? e}`;
-      this.presentToast(msg, 'danger');
-      this.setUiMsg('Microphone permission denied.', 'error');
-      throw e;
-    }
-  }
-
-  // --- DO NOT duplicate wsUrl above this ---
-
-  private stopMic(sendAudioEnd: boolean) {
-    try { this.procNode?.disconnect(); } catch { }
-    this.procNode = undefined;
-
-    try { this.srcNode?.disconnect(); } catch { }
-    this.srcNode = undefined;
-
-    try { this.audioCtx?.close(); } catch { }
-    this.audioCtx = undefined;
-
-    if (this.mediaStream) {
-      try { this.mediaStream.getTracks().forEach(t => t.stop()); } catch { }
-    }
-    this.mediaStream = undefined;
-    this.floatBuf.length = 0;
-
-    if (sendAudioEnd && this.connected) {
-      this.sendJson({ type: 'user_audio_end' });
-      this.append('🛑 sent user_audio_end');
-      this.wantMic = false;
-    }
-    if (this.micOn) this.micOn = false;
   }
 }
