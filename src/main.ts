@@ -5,6 +5,16 @@ import { IonicRouteStrategy, provideIonicAngular } from '@ionic/angular/standalo
 import { routes } from './app/app.routes';
 import { AppComponent } from './app/app.component';
 
+import { addIcons } from 'ionicons';
+import { alertCircle, checkmarkCircle, informationCircle } from 'ionicons/icons';
+
+addIcons({
+  'alert-circle': alertCircle,
+  'checkmark-circle': checkmarkCircle,
+  'information-circle': informationCircle,
+});
+
+
 bootstrapApplication(AppComponent, {
   providers: [
     { provide: RouteReuseStrategy, useClass: IonicRouteStrategy },
